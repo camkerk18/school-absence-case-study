@@ -57,9 +57,9 @@ The study uses data originally collected by **Susan Quine (1973)** on Australian
 
 ## Project Structure
 
-- **Data**  Raw and cleaned data files
-- **Plots** Generated visualizations
-- **Summary** Final write-up or R Markdown reports
+- **Data:**  Raw and cleaned data files
+- **Plots:** Generated visualizations
+- **Summary:** Final write-up or R Markdown reports
 
 
 ---

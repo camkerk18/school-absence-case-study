@@ -1,5 +1,6 @@
 # school-absence-case-study
 
+## Authors: author: Cameron Kerkemeyer and RJ Burjek
 
 ## Investigating Cultural and Personal Factors Behind Student Absences
 

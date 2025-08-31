@@ -57,3 +57,24 @@ The study uses data originally collected by **Susan Quine (1973)** on Australian
 
 ## Project Structure
 
+- **Data**  Raw and cleaned data files
+- **Plots** Generated visualizations
+- **Summary** Final write-up or R Markdown reports
+
+
+---
+
+## Takeaways
+
+- Cultural background can significantly affect a student’s ability to consistently attend school.
+- Race was the most impactful predictor in this dataset.
+- Other variables (like gender and learner type) contributed to a lesser extent.
+- Model refinement and testing with more diverse datasets is recommended for future work.
+
+---
+
+## Acknowledgments
+
+- Data Source: *Susan Quine, 1973*
+- Study conducted as part of a college-level case study in statistical modeling and inference.
+

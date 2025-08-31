@@ -1,0 +1,572 @@
+---
+title: "School Absence Case Study"
+author: "Cameron Kerkemeyer and RJ Burjek"
+date: "2023-12-11"
+output: html_document
+---
+
+## Overview
+
+In this data set, we have 154 children, either white or Australian Aboriginal, from the study of the number of days absent from school during a school year. The sociological study reported by Quine (1975), had children from both genders (male and female), four age groups (first, second, third, and final grade of secondary school), and the level of learning (slow or average) each child was. The response variable being measured is the number of days absent (absent). While the predictors are genders (gender), cultural group (race), grade in school (school), and level of learning (learner).
+
+ 
+## Libraries and Data
+
+```{r}
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(ellipse)
+library(faraway)
+library(lmtest)
+library(caret)
+library(splines)
+library(grid)
+library(car)
+library(MASS)
+library(lmtest)
+library(agricolae)
+
+school2 = read.csv("/Users/camkerk18/Desktop/notinschool.csv", header = TRUE)
+school1 = as_tibble(school2)
+school1
+school1 = as.data.frame(school1)
+```
+
+## Model A: Absence vs. Race
+
+Boxplot representing absence and race given the data.
+```{r}
+school1$race = as.factor(school1$race)
+ggplot(school1, aes(race, absent)) + geom_boxplot()
+
+```
+
+The initial linear regression model for Model A.
+
+```{r}
+model.a = lm(absent ~ race, data = school1)
+```
+
+Summary statistics for Model A
+
+```{r}
+summary(model.a)
+```
+
+Various plots for the linear regression model of Model A.
+
+```{r}
+par(mfrow= c(2,2))
+plot(model.a)
+```
+
+```{r}
+hist(model.a$residuals)
+```
+
+```{r}
+ks.test(model.a$residuals, 'pnorm')
+```
+
+```{r}
+levene.model.a = lm(abs(model.a$res) ~ race, data = school1)
+summary(levene.model.a)
+```
+
+```{r}
+model.a.levs = lm.influence(model.a)$hat
+head(model.a.levs)
+```
+
+```{r}
+n = dim(model.a$model)[1]
+p = length(variable.names(model.a))
+model.a.highlevs = model.a.levs[model.a.levs>2*p/n]
+model.a.highlevs
+```
+
+```{r}
+halfnorm(model.a.levs, ylab = "Leverages")
+```
+
+No high leverage points found.
+
+```{r}
+model.a.resid = rstudent(model.a)
+model.a.resid.sorted = sort(abs(model.a.resid), decreasing = TRUE)[1:10]
+model.a.resid.sorted
+```
+
+```{r}
+bonf.cv = abs(qt(0.05/(2*n), n-p-1))
+bonf.cv
+```
+
+```{r}
+which(model.a.resid.sorted >= bonf.cv)
+```
+
+Three outliers found: Observations 61, 111, 77
+
+```{r}
+model.a.cooks = cooks.distance(model.a)
+sort(model.a.cooks, decreasing = TRUE)[1:10]
+```
+
+```{r}
+which(model.a.cooks >= 1)
+```
+
+No influential observations found.
+
+# Equality of Means Testing
+
+```{r}
+anova(model.a)
+```
+
+Pairwise Comparisons with Schefee's Test
+
+```{r}
+scheffe.test(aov(absent ~ race, school1), "race", group = TRUE, console = TRUE)
+```
+
+## Model B: Absence vs. Race and Gender
+
+```{r}
+ggplot(school1, aes(gender, absent)) + geom_boxplot()
+```
+
+```{r}
+boxplot(absent ~ race, data = school1)
+```
+
+```{r}
+boxplot(absent ~ gender, data = school1)
+```
+
+```{r}
+interaction.plot(school1$race, school1$gender, school1$absent)
+```
+
+```{r}
+interaction.plot(school1$gender, school1$race, school1$absent)
+```
+
+```{r}
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+  plots <- c(list(...), plotlist)
+  numPlots = length(plots)
+  
+  if (is.null(layout)) {
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    for (i in 1:numPlots) {
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+```{r}
+p1 = ggplot(aes(x = gender, y = absent), data = school1) +
+  geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = -45))
+p2 = ggplot(aes(x = race, y = absent), data = school1) +
+  geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = -45))
+p3 = ggplot(school1, aes(x = race, y = absent)) +
+  geom_point() + 
+  stat_summary(fun = "mean", geom = "line", aes(group = gender, linetype = gender)) +
+  theme(legend.position = "top", legend.direction = "horizontal")
+p4 = ggplot(school1, aes(x = gender, y = absent)) +
+  geom_point() +
+  stat_summary(fun = "mean", geom = "line", aes(group = race, linetype = race)) +
+  theme(legend.position = "top", legend.direction = "horizontal") 
+
+multiplot(p1, p2, p3, p4, cols = 2)
+```
+
+```{r}
+model.b = lm((absent + 1) ~ gender * race, data = school1)
+summary(model.b)
+```
+
+```{r}
+Anova(model.b, type = "III")
+```
+
+```{r}
+par(mfrow = c(1,2))
+qqnorm(model.b$res)
+plot(model.b$fitted, model.b$res, xlab = "Fitted", ylab = "Residuals")
+```
+
+```{r}
+boxcox(model.b)
+```
+
+```{r}
+model.b_additive = lm((absent + 1) ~ gender + race, data = school1)
+summary(model.b_additive)
+```
+
+```{r}
+Anova(model.b_additive, type = "III")
+```
+
+```{r}
+par(mfrow = c(1,2))
+qqnorm(model.b_additive$res)
+plot(model.b_additive$fitted, model.b_additive$res, xlab = "Fitted", ylab = "Residuals")
+```
+
+```{r}
+boxcox(model.b_additive)
+```
+
+```{r}
+TukeyHSD(aov(absent ~ gender + race, data = school1), "gender")
+```
+
+```{r}
+Interaction_CI = TukeyHSD(aov(absent ~ gender + race, data = school1), "gender")
+plot(Interaction_CI)
+```
+
+```{r}
+TukeyHSD(aov(absent ~ race, data = school1), "race")
+```
+
+```{r}
+CI_plot = TukeyHSD(aov(absent ~ gender + race, data = school1), "race")
+plot(CI_plot)
+```
+
+
+## Model C: Absence vs. Race and Gender and School
+
+```{r}
+ggplot(school1, aes(school, absent)) + geom_boxplot()
+```
+
+
+# Boxplots of factors with different levels:
+
+```{r}
+boxplot(absent ~ gender, data = school1) 
+```
+
+```{r}
+boxplot(absent ~ race, data = school1)
+```
+
+```{r}
+boxplot(absent ~ school, data = school1) 
+```
+
+# Interaction Plots:
+
+```{r}
+interaction.plot(school1$gender, school1$school, school1$absent)
+```
+
+```{r}
+interaction.plot(school1$gender, school1$race, school1$absent)
+```
+
+```{r}
+interaction.plot(school1$school, school1$race, school1$absent)
+```
+
+# Fitting the Full Model:
+
+```{r}
+Anova(lm(absent ~ gender*race*school, data = school1), type = "III") 
+```
+
+```{r}
+Anova(lm(absent ~ gender + race + school + gender:school + race:school + gender:race:school, data = school1), type = "III") 
+```
+
+```{r}
+Anova(lm(absent ~ gender + school + gender:school + race:school + gender:race:school, data = school1), type = "III") 
+```
+
+```{r}
+Anova(lm(absent ~ gender + school + gender:school + race:school, data = school1), type = "III")
+```
+
+```{r}
+Anova(lm(absent ~ school + gender:school + race:school, data = school1), type = "III") 
+```
+
+```{r}
+Anova(lm(absent ~ school + race:school, data = school1), type = "III") 
+```
+
+```{r}
+model.c = lm((absent + 1) ~ school + race:school, data = school1) 
+Anova(model.c, type = "III")
+```
+
+```{r}
+plot(model.c, which = 1)
+```
+
+```{r}
+plot(model.c, which = 2)	
+```
+
+```{r}
+ks.test(model.c$residuals, "pnorm") 
+```
+
+```{r}
+bptest(model.c) 
+```
+
+```{r}
+model.c.transform = boxcox(model.c)
+```
+
+```{r}
+lambda = model.c.transform$x[which.max(model.c.transform$y)]
+lambda
+```
+
+```{r}
+model.c.new = lm((absent + 1)^(-1) ~ gender + race + school, data = school1)
+ks.test(model.c.new$residuals, "pnorm")
+```
+
+```{r}
+bptest(model.c.new)
+```
+
+```{r}
+school1.leverages = influence(model.c.new)$hat
+halfnorm(school1.leverages, 6, labs = as.character(1:length(school1.leverages)),
+         ylab = "Leverages")
+```
+
+```{r}
+n = dim(school1)[1] 
+p = 8 
+school.c.lev = lm.influence(model.c)$hat 
+school.c.lev.high = school.c.lev[school.c.lev > ((2*p)/n)] 
+school.c.lev.high 
+```
+
+```{r}
+IQR_y.c = IQR(school1$absent) 
+q1.c = quantile(school1$absent, 0.25) 
+q3.c = quantile(school1$absent, 0.75) 
+lower_lim.c = q1.c - IQR_y.c 
+upper_lim.c = q3.c + IQR_y.c 
+range = c(lower_lim.c, upper_lim.c) 
+school.c.highlev = school1[school.c.lev > ((2*p)/n),] 
+school.c.highlev.lower = school.c.highlev[school.c.highlev$absent < range[1],] 
+school.c.highlev.upper = school.c.highlev[school.c.highlev$absent > range[2],] 
+c.lev.bad = rbind(school.c.highlev.lower, school.c.highlev.upper) 
+c.lev.bad 
+```
+
+```{r}
+school.c.cooks = cooks.distance(model.c) 
+plot(school.c.cooks) 
+```
+
+```{r}
+which(school.c.cooks >= 1)
+```
+
+```{r}
+school.c.resid = rstudent(model.c) 
+school.c.resid.sorted = sort(abs(school.c.resid), decreasing = TRUE)
+bonferroni_cv1.c = abs(qt(0.05/(2 * n), n-p-1)) 
+which(school.c.resid.sorted >= bonferroni_cv1.c) 
+```
+
+Two Outliers found: data points 77 and 111.
+
+```{r}
+TukeyHSD(aov(model.c, data = school1))
+```
+
+
+## Model D: Absence vs. Race and Gender and School and Level of Learning
+
+```{r}
+ggplot(school1, aes(learner, absent)) + geom_boxplot()
+```
+
+# Boxplots of the factors with different levels:
+
+```{r}
+boxplot(absent ~ gender, data = school1)
+```
+
+```{r}
+boxplot(absent ~ school, data = school1)
+```
+
+```{r}
+boxplot(absent ~ race, data = school1)
+```
+
+```{r}
+boxplot(absent ~ learner, data = school1)
+```
+
+# Interaction Plots:
+
+```{r}
+interaction.plot(school1$gender, school1$race, school1$absent)
+```
+
+```{r}
+interaction.plot(school1$school, school1$race, school1$absent)
+```
+
+```{r}
+interaction.plot(school1$learner, school1$race, school1$absent)
+```
+
+```{r}
+interaction.plot(school1$school, school1$gender, school1$absent)
+```
+
+```{r}
+interaction.plot(school1$learner, school1$gender, school1$absent)
+```
+
+```{r}
+interaction.plot(school1$learner, school1$school, school1$absent)
+```
+
+# Fitting of the Full Model:
+
+```{r}
+fullmodel.d = lm(absent ~ gender * learner * race * school, data = school1)
+```
+
+```{r}
+stepwise = step(fullmodel.d, direction = "both")
+```
+
+```{r}
+model.d = lm((absent + 1) ~ gender + learner + race + school + learner:race + 
+               gender:school + learner:school + race:school + 
+               learner:race:school, data = school1)
+```
+
+```{r}
+plot(model.d, which = 1)
+```
+
+```{r}
+plot(model.d, which = 1)
+```
+
+```{r}
+plot(model.d, which = 2)
+```
+
+```{r}
+ks.test(model.d$residuals, "pnorm")
+```
+
+```{r}
+bptest(model.d)
+```
+
+```{r}
+model.d.transform = boxcox(model.d)
+```
+
+```{r}
+lambda = model.d.transform$x[which.max(model.d.transform$y)]
+lambda
+```
+
+```{r}
+model.d.new = lm((absent + 1)^(-1) ~ race + gender + learner + school, data = school1)
+ks.test(model.d.new$residuals, "pnorm")
+```
+
+```{r}
+bptest(model.d.new)
+```
+
+```{r}
+school1.leverages = influence(model.d.new)$hat
+halfnorm(school1.leverages, 6, labs = as.character(1:length(school1.leverages)), 
+         ylab = "Leverages")
+```
+
+```{r}
+n = dim(school1)[1]
+p = 7
+school1.lev = lm.influence(model.d.new)$hat
+school1.lev.high = school1.lev[school1.lev > ((2*p)/n)]
+school1.lev.high
+```
+
+```{r}
+IQR_y = IQR(school1$absent)
+q1 = quantile(school1$absent, 0.25)
+q3 = quantile(school1$absent, 0.75)
+lower_lim = q1 - IQR_y
+upper_lim = q3 + IQR_y
+range = c(lower_lim, upper_lim)
+school1.highlev = school1[school1 > ((2*p)/n),]
+school1.highlev.lower = school1.highlev[school1.highlev$absent < range[1],]
+school1.highlev.upper = school1.highlev[school1.highlev$absent > range[2],]
+lev.bad = rbind(school1.highlev.lower, school1.highlev.upper)
+lev.bad
+```
+
+```{r}
+school1.cooks = cooks.distance(model.d.new)
+plot(school1.cooks)
+```
+
+```{r}
+which(school1.cooks >= 1)
+```
+
+```{r}
+school1.resid = rstudent(model.d.new)
+school1.resid.sorted = sort(abs(school1.resid), decreasing = TRUE)
+bonferroni_cv1 = abs(qt(0.05/(2*n), n-p-1))
+which(school1.resid.sorted >= bonferroni_cv1)
+```
+
+Two Outliers found: Data points 66 and 105
+
+```{r}
+TukeyHSD(aov(model.d.new, data = school1))
+```
+
+
+
+
+
+
+
+
+
